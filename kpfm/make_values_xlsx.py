@@ -3,7 +3,9 @@
 """Exports the extracted contrast values to spreadsheet form."""
 import numpy as np, openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-exec(open("kpfm_v1.py").read().split("def contrast")[0])   # DATA, LIFT
+import os as _os
+_here = _os.path.dirname(_os.path.abspath(__file__))
+exec(open(_os.path.join(_here, "kpfm_v1.py")).read().split("def contrast")[0])   # DATA, LIFT
 NM=["tBTO","cBTO","SiO2"]; LBL={"SiO2":"SiO2"}
 
 def extract(x,y,q_top=0.80,q_base=0.20):

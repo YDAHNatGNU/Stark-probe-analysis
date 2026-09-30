@@ -1,0 +1,136 @@
+============================================================
+REPRODUCTION
+
+  "Solvent-Reconstructed Electric Fields at Solid-Liquid Interfaces"
+  Cho et al.
+============================================================
+
+
+------------------------------------------------------------
+1. STEP-BY-STEP REPRODUCTION AND EXPECTED OUTPUT
+------------------------------------------------------------
+
+Each script listed below is executed with the Python interpreter. run.sh
+performs all of these steps automatically. Intermediate .json / .npy files
+are written to the working folder and consumed by later steps; run.sh gives
+the order used.
+
+electrostatics/
+------------------------------------------------------------
+  validate.py          baseline check, centroid collocation, eps_m = 1
+                       (not the source of a table)
+  validation_data.py   Table S3.1 (V1), max. relative error at r/R = 1.05:
+                       5.68 / 2.19 / 1.02 / 0.55 % for 320-20,480 panels
+                       (subdiv 5 needs ~3.5 GB of memory)
+                       Table S4.2 (V2): mean |E| 41.80 / 49.79 / 53.35 MV/m
+                       vs analytical 56.50 MV/m; Richardson k = 1.17,
+                       error 0.51 %
+  analyze_tem.py       shape pipeline on the three micrographs in data/TEM;
+                       p = 5.5 (IQR 4.6-6.3), r_c/L = 0.139 is the value from
+                       the full image set
+  surf_rms.py          surf_rms.json
+  r1a_recalc.py        Table S3.2: ceiling 134.8 / 50.6 / 45.5 MV/cm
+  r3a_recalc.py        geometric x0.667, dielectric x0.953 (EtOH)
+  rebuild_data.py      EF_Local(0) = 26.95 / 33.97 / 40.07 / 43.63 MV/cm;
+                       identical to deposited ef_data.npy: True
+  booth_model.py       E_c = 4.1 MV/cm; half-decay distances by Eq. S5.8:
+                       linear continuum 18.2 / 18.4 / 18.5 / 18.7 nm;
+                       measured, recomputed from ef_data.npy
+                       12.5 / 10.4 / 8.7 / 6.3 nm (+- 1.3 / 1.0 / 1.2 / 0.7);
+                       Table S5.1 values (halfdecay_mc.json, Monte Carlo
+                       means) 12.86 / 10.46 / 8.70 / 6.38 nm, shown alongside
+  selfcons.py          selfcons_scan.json
+  run_shapes.py        shape_selfcons.json; shape factors
+                       0.845 / 0.726 / 0.681 / 0.709
+  table_s62.py         Table S6.2: saturation 1.13 / 1.27 / 1.46 / 1.76,
+                       measured 3.26 / 3.14 / 3.15 / 2.47, r = 0.97
+  corr_model.py        Table S6.3: 11.42 / 7.00 / 5.25 / 3.38
+  calc_table.py        sim_table.json
+
+lineshape/
+------------------------------------------------------------
+  cumulant_analysis.py
+  Expected output at the primary window W = 80 meV:
+
+    tBTO 25 spectra, SiO2 25 spectra
+
+    --- W = 80 meV (primary) ---
+    dkappa2 =   310.4 +-  50.8 meV^2   (t =  6.11)
+    dkappa3 =  1666.9 +- 824.4 meV^3   (t =  2.02)
+    gamma1  = 0.307   95% CI [0.000, 1.004]
+    |m|     = 0.152   95% upper bound 0.387
+
+  The script then repeats the analysis for windows of 60-150 meV (Table S1.3),
+  each with 20,000 resamples and seed 0, so the W = 80 meV row equals the
+  primary result.
+
+kpfm/
+------------------------------------------------------------
+  kpfm_v1.py             kpfm_v1.json, step-height contrast per region
+  kpfm_z0.py             all regions (5, 4 and 5): 29.5, 30.3, 19.2 mV
+  kpfm_paper_values.py   regions analysed in the paper:
+
+    Contrast at z = 0 (mean +- s.e.m.)
+      tBTO   34.2 +- 2.5 mV   regions [3, 4, 5]
+      cBTO   25.4 +- 1.6 mV   regions [1, 3, 4]
+      SiO2   12.3 +- 0.6 mV   regions [2, 4, 5]
+    Unpaired two-sided Student t-tests: p = 0.042, 0.001, 0.001
+    Relative decay rate over 0-20 nm
+      tBTO   1.81 +- 0.25 %/nm
+      cBTO   1.59 +- 0.23 %/nm
+      SiO2   0.45 +- 0.80 %/nm
+    Unpaired two-sided Student t-tests: p = 0.558, 0.181, 0.244
+
+
+------------------------------------------------------------
+2. NOTES ON THE NUMERICAL METHOD
+------------------------------------------------------------
+
+The electrostatics is solved as a Fredholm integral equation of the second kind
+for the bound surface charge (the boundary-charge, or induced-surface-charge,
+formulation). Because the dielectric contrast |lambda| < 1 at every interface,
+the system matrix is diagonally dominant and well conditioned - a property
+relied on given the near cancellation between interfaces documented in
+Supplementary Note 4.
+
+The geometric matrix M depends only on the mesh, so it is assembled once and
+cached (asm_cache.py) across the permittivity updates of each self-consistent
+solve.
+
+
+------------------------------------------------------------
+3. RUNNING THE PACKAGE ON CODE OCEAN
+------------------------------------------------------------
+
+On Code Ocean the package occupies the code folder of the capsule, with the
+input data in a data folder inside it, and all outputs are written to the
+results folder of the capsule.
+
+run.sh is the entry point. It resolves every location at run time relative to
+its own position, sets PYTHONPATH so that the modules in electrostatics can be
+imported by one another, links the deposited intermediate files into the
+working folder, and then executes the analysis in nine steps. The same script
+therefore runs unchanged on Code Ocean or on a local machine. The data location
+can be overridden by setting the DATA_DIR environment variable. A complete run
+takes 15-25 min on a 2-core machine with 8 GB of memory.
+
+In addition to the raw measurements, the data folder holds four intermediate
+files that are inputs rather than outputs of this package:
+
+  ef_data.npy        the Stark fields EF_Local(d) extracted from the
+                     linewidths; rebuild_data.py regenerates it from the
+                     Source Data linewidth table and confirms it is identical
+  halfdecay_mc.json  the measured half-decay distances listed in Table S5.1
+                     (Monte Carlo means); the generating script was not
+                     preserved, and booth_model.py recomputes the half-decay
+                     distances from ef_data.npy by Eq. S5.8 and prints both
+  budget4.json       the enhancement budget used by the exclusion test
+  run_b.json         the bare-particle reference used by the shell decomposition
+
+The shape pipeline, analyze_tem.py, runs on the three representative
+micrographs in data/TEM. The population value of the rounding exponent,
+p = 5.5 (IQR 4.6-6.3), used throughout was obtained with the same script on the
+full TEM image set.
+
+
+============================================================

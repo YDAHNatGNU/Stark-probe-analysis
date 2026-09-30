@@ -26,4 +26,3 @@ for s,em in SOLV.items():
     print(f"{s:>6}: ref {b1:6.3f} -> geom {b2:6.3f} (x{b2/b1:.3f}) "
           f"-> total {b3:6.3f} (x{b3/b2:.3f})   total x{b3/b1:.3f}")
 json.dump(out,open("r3a_data.json","w"),indent=1)
-print("\nThe hard-coded values 8.38 / 6.58 / 6.29 were of unknown origin and are replaced above")

@@ -29,7 +29,31 @@ SOLV = {
     "PrOH":  (20.1, 1.3856, 0.803, 60.10, 1.68),
     "HexOH": (13.0, 1.4178, 0.814, 102.17, 1.65),
 }
-MEAS_HALF = {"MeOH": 12.7, "EtOH": 10.5, "PrOH": 8.8, "HexOH": 6.4}
+# Measured half-decay distances, Eq. S5.8: log-linear interpolation between the
+# two separations that bracket E(0)/2, applied to the measured EF_Local(d)
+# (ef_data.npy). Uncertainty: 20,000 Monte Carlo draws of EF within its s.d.
+_EF = np.load("ef_data.npy", allow_pickle=True).item()
+_DMEAS = np.array([0.0, 5.0, 10.0, 15.0, 20.0])
+
+
+def half_decay(E, d=_DMEAS):
+    y = E / E[0]
+    i = np.where(y < 0.5)[0]
+    if len(i) == 0:
+        return np.nan
+    i = i[0]
+    if E[i] > 0 and E[i-1] > 0:
+        return d[i-1] + (d[i]-d[i-1])*np.log(2*E[i-1]/E[0])/np.log(E[i-1]/E[i])
+    return np.interp(0.5, [y[i], y[i-1]], [d[i], d[i-1]])
+
+
+MEAS_HALF, MEAS_HALF_SD = {}, {}
+_rng = np.random.default_rng(0)
+for _s in ("MeOH", "EtOH", "PrOH", "HexOH"):
+    _E, _sE = _EF[_s]["EF"], np.nan_to_num(_EF[_s]["sEF"])
+    MEAS_HALF[_s] = float(half_decay(_E))
+    _mc = np.array([half_decay(_E + _rng.normal(0, 1, len(_E))*_sE) for _ in range(20000)])
+    MEAS_HALF_SD[_s] = float(np.nanstd(_mc))
 
 sr = json.load(open("surf_rms.json"))
 _d = [0.5, 5.0, 10.0, 15.0, 20.0]
@@ -109,10 +133,21 @@ for i in range(0, 81, 10):
 print("\n" + "="*78)
 print("3) Half-decay distance comparison")
 print("="*78)
-print(f"{'solvent':>7}{'eps_r':>8}{'saturation model':>11}{'linear continuum':>12}{'measured':>9}")
+# Values listed in Table S5.1 (Monte Carlo means, deposited as halfdecay_mc.json;
+# the script that generated them was not preserved).
+try:
+    REPORTED = json.load(open("halfdecay_mc.json"))
+except OSError:
+    REPORTED = {}
+print(f"{'solvent':>7}{'eps_r':>8}{'saturation':>11}{'linear':>12}{'measured (Eq. S5.8)':>22}"
+      + (f"{'Table S5.1':>20}" if REPORTED else ""))
 for s in SOLV:
     y = res[s]/res[s][0]
     i = np.where(y < 0.5)[0]
     hs = np.interp(0.5, [y[i[0]], y[i[0]-1]], [dd[i[0]], dd[i[0]-1]]) if len(i) else np.nan
-    print(f"{s:>7}{SOLV[s][0]:>8.1f}{hs:>11.1f}{17.9:>12.1f}{MEAS_HALF[s]:>9.1f}")
+    # linear continuum on the measured shape (surf_rms.json), same Eq. S5.8
+    Ec = np.array([sr[s][str(x)]["rms"] for x in _d])
+    hc = half_decay(Ec, np.array([0.0, 5.0, 10.0, 15.0, 20.0]))
+    rep = (f"{REPORTED[s][0]:>8.2f} +- {REPORTED[s][1]:.2f}" if REPORTED else "")
+    print(f"{s:>7}{SOLV[s][0]:>8.1f}{hs:>11.1f}{hc:>12.1f}{MEAS_HALF[s]:>12.1f} +- {MEAS_HALF_SD[s]:.1f}{rep}")
 np.save("booth_results.npy", {"dd": dd, "res": res, "PAR": PAR}, allow_pickle=True)

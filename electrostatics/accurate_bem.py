@@ -66,6 +66,28 @@ def solve_sigma_analytic(geom, Ps, eps_b, eps_m):
     return np.linalg.solve(A, rhs)
 
 
+def solve_sigma_analytic_inplace(geom, Ps, eps_b, eps_m):
+    """Same system as solve_sigma_analytic, assembled and factorised in place
+    (one N x N array) for large meshes such as subdiv 5 (N = 20,480)."""
+    import scipy.linalg as sl
+    lam = (eps_b - eps_m) / (eps_b + eps_m)
+    p0, p1, p2 = geom["tri"]
+    c = geom["centroids"]; n = geom["normals"]
+    N = len(c)
+    A = np.empty((N, N))
+    for i in range(N):
+        J = tri_int_vec(c[i], p0, p1, p2)
+        A[i, :] = (n[i][None, :] * J).sum(axis=1) / (4.0 * np.pi)
+    A[np.diag_indices(N)] = 0.0
+    A *= -2.0 * lam
+    A[np.diag_indices(N)] += 1.0
+    rhs = (2.0 / (eps_b + eps_m)) * Ps * n[:, 2]
+    # A.T is Fortran-ordered, so LAPACK factorises it in place without a copy;
+    # trans=1 then solves the original system A x = rhs.
+    lu, piv = sl.lu_factor(A.T, overwrite_a=True, check_finite=False)
+    return sl.lu_solve((lu, piv), rhs, trans=1, check_finite=False)
+
+
 def field_analytic(points, geom, sigma):
     """Exterior field from analytical integration, accurate close to the surface.
     points (P,3)."""

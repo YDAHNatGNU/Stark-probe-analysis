@@ -6,7 +6,8 @@ import warnings; warnings.filterwarnings("ignore")
 import numpy as np, json, gc, time
 from ferroelectric_bem import (build_geometry, sphere_analytic, EPS0,
                                field_at)
-from accurate_bem import solve_sigma_analytic, field_analytic
+from accurate_bem import (solve_sigma_analytic, solve_sigma_analytic_inplace,
+                          field_analytic)
 from core_shell_bem import (offset_mesh, solve_core_shell, field_core_shell,
                             analytic_E)
 
@@ -15,14 +16,16 @@ OUT = {}
 
 # ------------------------------------------------------------------
 # ------------------------------------------------------------------
-print("V1: sphere validation ...")
+print("V1: sphere validation (Table S3.1) ...")
 eb, em, R = 6.0, 24.5, 1.0
 th = np.linspace(0.05, np.pi-0.05, 25)
 rfacs = [1.05, 1.25, 1.5, 2.0, 3.0]
 v1 = {"rfac": rfacs, "levels": {}}
-for sub in (2, 3, 4):
+for sub in (2, 3, 4, 5):
     g = build_geometry("sphere", subdiv=sub, R=R)
-    sig = solve_sigma_analytic(g, Ps, eb, em)
+    # subdiv 5 (20,480 panels) uses the in-place solver to keep memory ~3.5 GB
+    sig = (solve_sigma_analytic(g, Ps, eb, em) if sub < 5
+           else solve_sigma_analytic_inplace(g, Ps, eb, em))
     errs, bem, ana = [], [], []
     for rf in rfacs:
         pts = np.column_stack([rf*np.sin(th), np.zeros_like(th), rf*np.cos(th)])
@@ -53,7 +56,7 @@ del g4, sig4; gc.collect()
 
 # ------------------------------------------------------------------
 # ------------------------------------------------------------------
-print("V2: core-shell validation ...")
+print("V2: core-shell validation (Table S4.2; fields in V/m) ...")
 es, R1, t = 3.9, 1.0, 0.20
 R2 = R1+t
 v2 = {"levels": {}}
@@ -70,14 +73,15 @@ for sub in (2, 3, 4):
     v2["levels"][sub] = {"n_panels": int(len(sig)), "max_rel_err": err,
                          "mean_BEM": float(Eb.mean()),
                          "mean_analytic": float(Ea.mean())}
-    print(f"   subdiv={sub} N={len(sig)} err={err:.4f}")
+    print(f"   subdiv={sub} N={len(sig)} mean|E| BEM={Eb.mean()/1e6:.2f} MV/m "
+          f"analytic={Ea.mean()/1e6:.2f} MV/m  max rel err={err:.4f}")
     del gc_, gs_, sig, gg; gc.collect()
 k = np.log2(abs((vals[2]-vals[3])/(vals[3]-vals[4])))
 Einf = vals[4] + (vals[4]-vals[3])/(2**k-1)
 v2["richardson"] = {"order_k": float(k), "extrapolated": float(Einf),
                     "analytic": float(Ea.mean()),
                     "rel_err": float(abs(Einf-Ea.mean())/Ea.mean())}
-print(f"   Richardson k={k:.2f} err={v2['richardson']['rel_err']:.4f}")
+print(f"   Richardson k={k:.2f} E_inf={Einf/1e6:.2f} MV/m err={v2['richardson']['rel_err']:.4f}")
 OUT["V2_coreshell_validation"] = v2
 
 # ------------------------------------------------------------------

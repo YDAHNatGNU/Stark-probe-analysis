@@ -1,9 +1,19 @@
 # Supplementary Software for "Solvent-Reconstructed Electric Fields at
 # Solid-Liquid Interfaces" (Cho et al.). MIT License; see LICENSE.
+"""Differential cumulant analysis of the Stark line shape. The observed line is
+the convolution of the intrinsic emission with the distribution of Stark shifts,
+and cumulants are additive under convolution, so the cumulants of the Stark
+kernel follow by subtracting those of the Stark-free control. No line-shape model
+is assumed."""
 import numpy as np
 import openpyxl
+import os as _os
+# Input data are read from the data folder beside the analysis folders;
+# the location can be overridden with the DATA_DIR environment variable.
+_DATA = _os.environ.get("DATA_DIR") or _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data")
 
-XLSX = "../data/Spectrum_Rawdata_tBTO_SiO2_in_EtOH.xlsx"
+XLSX = _os.path.join(_DATA, "Spectrum_Rawdata_tBTO_SiO2_in_EtOH.xlsx")
 W     = 0.080      # window half-width (eV)
 NBOOT = 20_000
 rng   = np.random.default_rng(0)
@@ -85,7 +95,10 @@ if __name__ == "__main__":
     print(f"tBTO {len(a)} spectra, SiO2 {len(b)} spectra")
     report(*bootstrap(a, b), label=f"W = {W*1000:.0f} meV (primary)")
 
-    # window scan -> Table SX.3
+    # window scan -> Table S1.3
+    # Each window uses the primary estimator: 20,000 resamples, generator
+    # re-seeded (seed 0) per window, so the W = 80 meV row equals the primary result.
     for w in (0.06, 0.07, 0.08, 0.09, 0.10, 0.12, 0.15):
+        rng = np.random.default_rng(0)
         aa, bb = per_spectrum(*D["tBTO"], w=w), per_spectrum(*D["SiO2"], w=w)
-        report(*bootstrap(aa, bb, n=5000), label=f"W = {w*1000:.0f} meV")
+        report(*bootstrap(aa, bb, n=NBOOT), label=f"W = {w*1000:.0f} meV")

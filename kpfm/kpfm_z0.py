@@ -4,7 +4,9 @@
 regions, and sensitivity to the definition of the peak and substrate levels."""
 import numpy as np, json
 from scipy import stats
-exec(open("kpfm_v1.py").read().split("def contrast")[0])   # DATA, LIFT
+import os as _os
+_here = _os.path.dirname(_os.path.abspath(__file__))
+exec(open(_os.path.join(_here, "kpfm_v1.py")).read().split("def contrast")[0])   # DATA, LIFT
 NM=["tBTO","cBTO","SiO2"]
 rng=np.random.default_rng(0)
 

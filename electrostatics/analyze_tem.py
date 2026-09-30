@@ -16,11 +16,26 @@ from fourier_shape import radial_profile, fourier_amps, p_from_A4
 MEDIA = "tem/unpacked/word/media"
 
 TBTO = {}
-for line in open("tem/pairs.tsv"):
-    img, cap = line.strip().split("\t")
-    if cap.startswith("tBTO"):
-        mag = cap.split("__")[1]
-        TBTO[img] = mag
+if os.path.exists("tem/pairs.tsv"):
+    # full image set with its caption index (population value p = 5.5)
+    for line in open("tem/pairs.tsv"):
+        img, cap = line.strip().split("\t")
+        if cap.startswith("tBTO"):
+            mag = cap.split("__")[1]
+            TBTO[img] = mag
+else:
+    # representative micrographs deposited with the capsule (data/TEM)
+    _data = os.environ.get("DATA_DIR") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    # micrographs may sit in data/TEM or directly in data (TEM_*.tif)
+    MEDIA = os.path.join(_data, "TEM")
+    if not os.path.isdir(MEDIA):
+        MEDIA = _data
+    for img in sorted(os.listdir(MEDIA)):
+        if img.upper().startswith("TEM") and img.lower().endswith((".tif", ".tiff", ".jpg", ".png")):
+            TBTO[img] = "-"
+    print(f"Representative micrographs in {MEDIA}: {len(TBTO)} images. "
+          "The population value p = 5.5 (IQR 4.6-6.3) comes from the full image set.")
 
 A2_MAX = 0.085
 A6_REL = 0.60
@@ -65,8 +80,12 @@ def analyze(path):
 
 
 all_rec = []
-for img_name, mag in sorted(TBTO.items(),
-                            key=lambda kv: int(kv[0].replace("image","").replace(".jpg",""))):
+def _order(kv):
+    digits = "".join(ch for ch in kv[0] if ch.isdigit())
+    return int(digits) if digits else 0
+
+
+for img_name, mag in sorted(TBTO.items(), key=_order):
     path = os.path.join(MEDIA, img_name)
     try:
         recs, img, lab = analyze(path)
@@ -81,7 +100,7 @@ for img_name, mag in sorted(TBTO.items(),
 passed = [r for r in all_rec if r["pass"]]
 print(f"Detected particles {len(all_rec)}, passing QC: {len(passed)}")
 print(f"\n{'file':>10} {'mag':>7} {'A2':>7} {'A4':>7} {'A6':>7} "
-      f"{'p_fit':>6} {'p_四':>6} {'medf':>6}")
+      f"{'p_fit':>6} {'p_A4':>6} {'medf':>6}")
 for r in all_rec:
     flag = "OK " if r["pass"] else "rej"
     print(f"{r['file']:>10} {r['mag']:>7} {r['A2']:>7.3f} {r['A4']:>7.3f} "

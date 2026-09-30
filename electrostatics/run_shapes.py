@@ -9,7 +9,7 @@ from core_shell_bem import offset_mesh
 from accurate_bem import tri_int_vec
 from scipy.linalg import solve as lasolve
 EPS0,Ps,A_NM=8.8541878128e-12,0.26,56.7
-SOLV={"MeOH":(33.7,1.3288),"HexOH":(13.0,1.4178)}
+SOLV={"MeOH":(33.7,1.3288),"EtOH":(24.5,1.3611),"PrOH":(20.1,1.3856),"HexOH":(13.0,1.4178)}
 B=np.load("booth_results.npy",allow_pickle=True).item()
 EC={s:B["PAR"][s]["E_c"] for s in SOLV}
 MID=np.array([0.75,2.25,4.,6.5,10.,16.])
@@ -75,4 +75,7 @@ for shape in ("sphere","cube"):
     r=res[shape]
     print(f"{shape:>7} contrast(self-consistent) {r['HexOH']['sc']/r['MeOH']['sc']:.3f}  "
           f"(linear) {r['HexOH']['lin']/r['MeOH']['lin']:.3f}")
+print("\nShape factor (Eq. S6.6) = enhancement(measured shape) / enhancement(sphere), same mesh")
+for s in SOLV:
+    print(f"  {s:>6}: {res['cube'][s]['enh']/res['sphere'][s]['enh']:.3f}")
 json.dump(res,open("shape_selfcons.json","w"),indent=1)

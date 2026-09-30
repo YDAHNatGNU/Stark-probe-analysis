@@ -2,9 +2,15 @@
 # Solid-Liquid Interfaces" (Cho et al.). MIT License; see LICENSE.
 """Parses the KPFM line profiles and extracts the step-height contrast for each
 region and lift height."""
+import os as _os
+# Input data are read from the data folder beside the analysis folders;
+# the location can be overridden with the DATA_DIR environment variable.
+_DATA = _os.environ.get("DATA_DIR") or _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data")
+
 import numpy as np, openpyxl, json
 LIFT=[0,5,10,15,20]
-wb=openpyxl.load_workbook('../data/KPFM_raw.xlsx',data_only=True)
+wb=openpyxl.load_workbook(_os.path.join(_DATA, 'KPFM_raw.xlsx'),data_only=True)
 
 def col(ws,c,r0):
     v=[]
